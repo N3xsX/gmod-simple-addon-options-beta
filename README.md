@@ -1,5 +1,5 @@
 ## Overview
-The Simple Addon Options File is designed to streamline the process of implementing customizable settings in Garry's Mod addons. By using a simple and easy to read configuration file, developers can easily define various options for players to adjust according to their preferences.
+The Simple Addon Options is designed to streamline the process of implementing customizable settings in Garry's Mod addons. By using a simple and easy to read configuration file, developers can easily define various options for players to adjust according to their preferences.
 
 ## Features
 * Easy configuration: Define options using a straightforward syntax in a single file.
