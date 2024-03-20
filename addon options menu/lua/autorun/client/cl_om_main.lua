@@ -1,5 +1,8 @@
 local popupFrame
 local mainFrame
+local resetFrame
+local createPresetsFrame
+local loadPresetsframe
 
 function Opmenu:OpenPanel()
     if IsValid(self.frame) then
@@ -47,26 +50,34 @@ function Opmenu:OpenPanel()
         self:SetUpdateOnType(true)
     end
 
+    local numErrors = 0
     -- error icon/button
     function Opmenu:createError(num, addonName, categoryName, categoryInfo, conVar, optionType)
         if GetConVar("cl_sao_enable_error"):GetBool() == false then return end
+    
         frame.OnClose = function()
             self.enabled = false
         end
+
         Opmenu:PrintError(num, addonName, categoryName, categoryInfo, conVar, optionType)
+
+        numErrors = numErrors + 1
+    
         if not self.enabled then
-        local button = vgui.Create("DButton", frame)
-        button:SetText("")
-        button:SetSize(30, 30)
-        button:SetPos(10, 30)
-        button:SetImage("icon16/error.png")
-        self.enabled = true
-        button.DoClick = function()
-            notification.AddLegacy( "[SAO] Check Console", NOTIFY_ERROR, 4 )
-            surface.PlaySound( "buttons/button15.wav" )
-            self.enabled = false
-            button:Remove()
-        end
+            local button = vgui.Create("DButton", frame)
+            button:SetText("")
+            button:SetSize(30, 30)
+            button:SetPos(10, 30)
+            button:SetImage("icon16/error.png")
+            self.enabled = true
+            numErrors = 0
+            numErrors = numErrors + 1
+            button.DoClick = function()
+                notification.AddLegacy("[SAO] Check Console - You have " .. numErrors .. " error/s", NOTIFY_ERROR, 4 )
+                surface.PlaySound("buttons/button15.wav")
+                self.enabled = false
+                button:Remove()
+            end
         end
     end
 
@@ -94,9 +105,20 @@ function Opmenu:OpenPanel()
         end
         local checkBoxLabel = vgui.Create("DLabel", whitePanel)
         checkBoxLabel:SetPos(10, 8)
-        checkBoxLabel:SetText("Toggle Error Messages")
+        checkBoxLabel:SetText("Toggle error messages")
         checkBoxLabel:SetWide(150)
         checkBoxLabel:SetTextColor(Color(0, 0, 0))
+        local _checkBox = vgui.Create("DCheckBox", whitePanel)
+        _checkBox:SetPos(150, 55)
+        _checkBox:SetValue(GetConVar("cl_sao_enable_debug"):GetInt())
+        _checkBox.OnChange = function(self, isChecked)
+            RunConsoleCommand("cl_sao_enable_debug", isChecked and "1" or "0")
+        end
+        local _checkBoxLabel = vgui.Create("DLabel", whitePanel)
+        _checkBoxLabel:SetPos(10, 53)
+        _checkBoxLabel:SetText("Toggle debug info in options")
+        _checkBoxLabel:SetWide(150)
+        _checkBoxLabel:SetTextColor(Color(0, 0, 0))
         local comboBox = vgui.Create("DComboBox", whitePanel)
         comboBox:SetPos(60, 30)
         comboBox:SetSize(70, 20)
@@ -113,6 +135,11 @@ function Opmenu:OpenPanel()
         comboBox.OnSelect = function(_, index, value, data)
             RunConsoleCommand("cl_sao_img_size", index)
         end
+        local versionLabel = vgui.Create("DLabel", whitePanel)
+        versionLabel:SetPos(235, 90)
+        versionLabel:SetText("ver. 1.0")
+        versionLabel:SetWide(150)
+        versionLabel:SetTextColor(Color(0, 0, 0))
         mainFrame.OnClose = function()
             if IsValid(popup) then
                 popup:Close()
@@ -127,7 +154,7 @@ function Opmenu:OpenPanel()
     cbutton:SetPos(frameW - button:GetWide() - 140, 30)
     cbutton:SetImage("icon16/table_go.png")
     cbutton.DoClick = function()
-  
+        Opmenu:LoadPresets()
     end
 
     local buttonSize = GetConVar("cl_sao_img_size"):GetInt()
@@ -349,7 +376,7 @@ function Opmenu:OpenPanel()
                 if file.Exists(addonInfo.icon, "GAME") then
                     icon:SetImage(addonInfo.icon)
                 else
-                    Opmenu:createError(3, addonInfo.name)
+                    --Opmenu:createError(3, addonInfo.name)
                     icon:SetImage("noimg.png")
                 end
             else
@@ -357,6 +384,18 @@ function Opmenu:OpenPanel()
                 placeholderIcon:SetPos(5, 5)
                 placeholderIcon:SetSize(90 * buttonSizeSelect, 90 * buttonSizeSelect)
                 placeholderIcon:SetImage("noimg.png")
+            end
+            if addonInfo.customMenu == true then
+                local icon = vgui.Create("DImage", button)
+                icon:SetPos(5, 5)
+                icon:SetSize(10 * buttonSizeSelect, 10 * buttonSizeSelect)
+                icon:SetImage("icon16/feed_go.png")
+            end
+            if addonInfo.autoGenerateConvars == true then
+                local icon = vgui.Create("DImage", button)
+                icon:SetSize(10 * buttonSizeSelect, 10 * buttonSizeSelect)
+                icon:SetPos(buttonSizeX - icon:GetWide() - 5, 5)
+                icon:SetImage("icon16/table_error.png")
             end
             button.OnMousePressed = function(self, key)
                 if key == MOUSE_RIGHT then
@@ -380,16 +419,30 @@ function Opmenu:OpenPanel()
                     end
                     if addonInfo.version == nil then
                         local voption = menu:AddOption("Version: N/A")
-                        Opmenu:createError(5, addonInfo.name)
+                        --Opmenu:createError(5, addonInfo.name)
                         --voption:SetImage("icon16/application_xp_terminal.png")
                     else
                         local voption = menu:AddOption("Version: " .. addonInfo.version)
                         --voption:SetImage("icon16/application_xp_terminal.png")
                     end
+                    if addonInfo.customMenu == true then
+                        local option = menu:AddOption("Uses custom menu")
+                        option:SetFont("saoProperties")
+                        option:SetImage("icon16/feed_go.png")
+                    end
+                    if addonInfo.autoGenerateConvars == true then
+                        local option = menu:AddOption("AutoGenerateConvars is on!")
+                        option:SetFont("saoProperties")
+                        option:SetImage("icon16/table_error.png")
+                    end
                     menu:Open()
                 elseif key == MOUSE_LEFT then
                     --print("Button Clicked for Addon: " .. addonName)
-                    Opmenu:CreateOptionUI(addonInfo.name, addonName)
+                    if addonInfo.customMenu == true then
+                        hook.Call(addonInfo.customMenuHook)
+                    else
+                        Opmenu:CreateOptionUI(addonInfo.name, addonName)
+                    end
                 end
             end
     
@@ -410,7 +463,7 @@ function Opmenu:OpenPanel()
     
         local innerPanel = vgui.Create("DPanel", scrollPanel)
         innerPanel:SetWide(scrollPanel:GetWide())
-        innerPanel:SetTall(totalButtonHeight)
+        innerPanel:SetTall(2000)
     
         local startX = (frameW - buttonSizeX) / 2
         local startY = 0
@@ -436,6 +489,13 @@ function Opmenu:OpenPanel()
     end
 
 end
+
+local resetButton
+local createPresets
+local foundElements = false
+local optionButtons = {}
+local selectedButton = nil
+local categoryWidth, categoryHeight
 
 function Opmenu:CreateOptionUI(addonName, tableName)
     if IsValid(popupFrame) then
@@ -522,6 +582,7 @@ function Opmenu:CreateOptionUI(addonName, tableName)
     self.backButton:SetPos(10, 30)
     self.backButton:SetVisible(false)
     self.backButton.DoClick = function()
+        foundElements = false
         leftOptionButtonPanel:SetVisible(true)
         self.rightOptionButtonPanel:SetVisible(true)
         self.backButton:SetVisible(false)
@@ -532,6 +593,20 @@ function Opmenu:CreateOptionUI(addonName, tableName)
         if IsValid(self.rightPanel) then
             self.rightPanel:Remove()
             self.rightWhitePanel:Remove()
+        end
+        if IsValid(resetButton) then
+            resetButton:SetVisible(false)
+        end
+        if IsValid(createPresets) then
+            createPresets:SetVisible(false)
+        end
+        if IsValid(resetFrame) then
+            resetFrame:Close()
+            resetFrame = nil
+        end
+        if IsValid(createPresetsFrame) then
+            createPresetsFrame:Close()
+            createPresetsFrame = nil
         end
     end
 
@@ -556,6 +631,14 @@ function Opmenu:CreateOptionUI(addonName, tableName)
             popupFrame:Close()
             popupFrame = nil
         end
+        if IsValid(resetFrame) then
+            resetFrame:Close()
+            resetFrame = nil
+        end
+        if IsValid(createPresetsFrame) then
+            createPresetsFrame:Close()
+            createPresetsFrame = nil
+        end
     end
 
 end
@@ -564,20 +647,20 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
     local frameW, frameH = frame:GetSize()
 
     local leftPanel = vgui.Create("DScrollPanel", frame)
-    leftPanel:SetSize(frameW * 0.2, frameH * 0.8)
-    leftPanel:SetPos(10, 97)
+    leftPanel:SetSize(frameW * 0.2, frameH * 0.74)
+    leftPanel:SetPos(10, 130)
     leftPanel:GetVBar():SetWide(0)
     local leftWhitePanel = vgui.Create("DPanel", leftPanel)
     leftWhitePanel:SetSize(frameW * 0.2 - 5, frameH - 40)
     leftWhitePanel:SetBackgroundColor(Color(255, 255, 255))
 
-    local rightPanel = vgui.Create("DScrollPanel", frame)
-    rightPanel:SetSize(frameW * 0.79, frameH - 40)
+    local rightPanel = vgui.Create("DPanel", frame)
+    rightPanel:SetSize(frameW * 0.78, frameH - 40)
     rightPanel:SetPos(frameW * 0.21, 30)
-    rightPanel:GetVBar():SetWide(0)
-    local rightWhitePanel = vgui.Create("DPanel", rightPanel)
-    rightWhitePanel:SetSize(frameW * 0.79 - 5, frameH - 40)
+    local rightWhitePanel = vgui.Create("DScrollPanel", rightPanel)
+    rightWhitePanel:SetSize(frameW * 0.79 - 5, frameH + 2000)
     rightWhitePanel:SetBackgroundColor(Color(255, 255, 255))
+    rightWhitePanel:GetVBar():SetWide(0)
 
     local categories = {}
     local optionsTable = {}
@@ -595,12 +678,192 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
         end
     end
 
-    -- create buttons for each category
-    local selectedButton = nil
+    ----
+    resetButton = vgui.Create("DButton", frame)
+    resetButton:SetText("Reset Options")
+    resetButton:SetImage("icon16/arrow_refresh.png")
+    resetButton:SetSize(frameW * 0.2 - 3, 30)
+    resetButton:SetPos(10, 96)
+
+    local selectedSubcategoryButton = nil
+
+    resetButton.DoClick = function() -- reseting button
+        resetFrame = vgui.Create("DFrame")
+        resetFrame:SetSize(300, 150)
+        resetFrame:SetTitle("Reset Options")
+        resetFrame:Center()
+        resetFrame:MakePopup()
+
+        local textLabel = vgui.Create("DLabel", resetFrame)
+        textLabel:SetPos(10, 30)
+        textLabel:SetText("                      Please select the type of reset.\n     Choose 'SubCategory' if you want to reset the whole\n    subcategory, or choose 'Category' to reset the whole\n                      category type (client or server).\n                         This action can't be undone!")
+        textLabel:SizeToContents()
+        
+        local resetSubCategories = vgui.Create("DButton", resetFrame)
+        resetSubCategories:SetSize(140, 30)
+        resetSubCategories:SetPos(150, resetFrame:GetWide() * 0.35)
+        resetSubCategories:SetText("SubCategory")
+        resetSubCategories:SetEnabled(selectedSubcategoryButton ~= nil)
+        resetSubCategories.DoClick = function()
+            if selectedSubcategoryButton then
+                local categoryData = optionsTable[selectedSubcategoryButton]
+                if categoryData then
+                    for optionName, optionData in pairs(categoryData) do
+                        if optionName ~= "name" and optionData.default ~= nil then
+                            --print(optionData.conVar .. " ; " .. optionData.default)
+                            if optionData.type ~= "keybind" then
+                                RunConsoleCommand(optionData.conVar, optionData.default)
+                            end
+                            for _, button in ipairs(optionButtons) do
+                                button:Remove()
+                            end
+                            table.remove(optionButtons)
+                            if IsValid(selectedButton) then
+                                selectedButton.Paint = function()
+                                    surface.SetDrawColor(194, 193, 192, 255)
+                                    surface.DrawRect(0, 0, categoryWidth, categoryHeight)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        local resetCategories = vgui.Create("DButton", resetFrame)
+        resetCategories:SetSize(140, 30)
+        resetCategories:SetPos(10, resetFrame:GetWide() * 0.35)
+        resetCategories:SetText("Category")
+        resetCategories.DoClick = function()
+            for categoryName, categoryData in pairs(optionsTable) do
+                for optionName, optionData in pairs(categoryData) do
+                    if optionName ~= "name" and optionData.default ~= nil then
+                        --print(optionData.conVar .. " ; " .. optionData.default)
+                        if optionData.type ~= "keybind" then
+                            RunConsoleCommand(optionData.conVar, optionData.default)
+                        end
+                        for _, button in ipairs(optionButtons) do
+                            button:Remove()
+                        end
+                        table.remove(optionButtons)
+                        if IsValid(selectedButton) then
+                            selectedButton.Paint = function()
+                                surface.SetDrawColor(194, 193, 192, 255)
+                                surface.DrawRect(0, 0, categoryWidth, categoryHeight)
+                            end
+                        end
+                    end
+                    if optionName ~= "name" and optionName ~= "icon" and optionData.default == nil then
+                        Opmenu:createError(12, addonName, categoryName, nil, optionName, optionType)
+                    end
+                end
+            end
+        end
+    end
+
+    createPresets = vgui.Create("DButton", frame)
+    createPresets:SetText("Create Preset")
+    createPresets:SetImage("icon16/table_add.png")
+    createPresets:SetSize(frameW * 0.2 - 3, 30)
+    createPresets:SetPos(10, 63)
+
+    createPresets.DoClick = function()
+        local createPresetsFrame = vgui.Create("DFrame")
+        createPresetsFrame:SetSize(300, 200)
+        createPresetsFrame:SetTitle("Create a preset for selected category")
+        createPresetsFrame:Center()
+        createPresetsFrame:MakePopup()
+    
+        local whitePanel = vgui.Create("DPanel", createPresetsFrame)
+        whitePanel:SetSize(280, 150)
+        whitePanel:SetBackgroundColor(Color(255, 255, 255))
+        whitePanel:SetPos(10, 40)
+    
+        local typeBar = vgui.Create("DTextEntry", whitePanel)
+        typeBar:SetSize(whitePanel:GetWide() - 20, 30)
+        typeBar:SetPos(10, 10)
+        typeBar:SetText("")
+        typeBar:SetPlaceholderText("Select name...")
+        typeBar:SetEnterAllowed(true)
+    
+        local createButton = vgui.Create("DButton", createPresetsFrame)
+        createButton:SetSize(100, 30)
+        createButton:SetPos(createPresetsFrame:GetWide() * 0.5 - 50, createPresetsFrame:GetTall() - 50)
+        createButton:SetText("Create")
+        createButton.DoClick = function()
+            local presetName = typeBar:GetValue()
+            if presetName == "czolg" then -- :)
+                print("Japierdole czooooooooooooooołg!!!")
+            end
+            if presetName == "" or presetName:match("[^%w_]") then
+                notification.AddLegacy("[SAO] Invalid preset name", NOTIFY_ERROR, 4 )
+                surface.PlaySound("buttons/button15.wav")
+                return
+            end
+            if presetName:lower():find("client") or presetName:lower():find("server") then
+                notification.AddLegacy('[SAO] Presets can\'t contain "server" or "client" strings', NOTIFY_ERROR, 4)
+                surface.PlaySound("buttons/button15.wav")
+                return
+            end
+            local filePath = "sao_presets.txt"
+            local fileData = file.Read(filePath, "DATA") or ""
+            local presetsData = util.JSONToTable(fileData) or {}
+            for name, _ in pairs(presetsData) do
+                local strippedName = name:gsub("server_", ""):gsub("client_", "")
+                if strippedName == presetName then
+                    notification.AddLegacy("[SAO] Preset with the same name already exists", NOTIFY_ERROR, 4 )
+                    surface.PlaySound("buttons/button15.wav")
+                    return
+                end
+            end
+            local presetTable = {}
+            presetTable["addonName"] = self.existingExternalOptions[addonName].name
+            for categoryName, categoryData in pairs(optionsTable) do
+                if type(categoryData) == "table" then
+                    for optionName, optionData in pairs(categoryData) do
+                        if optionName ~= "name" and optionData.conVar ~= nil and optionData.type ~= "keybind" then
+                            if optionData.type ~= "slider" then
+                                presetTable[optionData.conVar] = GetConVar(optionData.conVar):GetInt()
+                            else
+                                presetTable[optionData.conVar] = GetConVar(optionData.conVar):GetFloat()
+                            end
+                        end
+                    end
+                end
+            end
+            presetName = optionType .. "_" .. presetName
+            local presetJson = util.TableToJSON(presetTable)
+            presetsData[presetName] = presetJson
+            local presetsJson = util.TableToJSON(presetsData)
+            file.Write(filePath, presetsJson)
+            print("[Simple Addon Options] Preset '" .. presetName .. "' created successfully.")
+            notification.AddLegacy("[SAO] Preset '" .. presetName .. "' created successfully", NOTIFY_HINT, 4 )
+            surface.PlaySound("buttons/button15.wav")
+            createPresetsFrame:Close()
+        end
+    end
+
     local posY = 5
     local buttonSizeY = 70
-    local optionButtons = {}
-    for categoryName, displayName in pairs(categories) do
+    if next(categories) == nil then
+        local nothingFoundLabel = vgui.Create("DLabel", rightWhitePanel)
+        nothingFoundLabel:SetText("Nothing found!")
+        nothingFoundLabel:SetTextColor(Color(0, 0, 0))
+        nothingFoundLabel:SetFont("saoCustomFont")
+        nothingFoundLabel:SizeToContents()
+        nothingFoundLabel:SetWide(300)
+        nothingFoundLabel:SetPos(rightWhitePanel:GetWide() * 0.55 - nothingFoundLabel:GetWide() * 0.5, rightWhitePanel:GetTall() * 0.05)
+    end
+    for categoryName, displayName in pairs(categories) do -- creating subcategory buttons
+        if not foundElements then
+            local nothingFoundLabel = vgui.Create("DLabel", rightWhitePanel)
+            nothingFoundLabel:SetText("Select subcategory to view options")
+            nothingFoundLabel:SetTextColor(Color(0, 0, 0))
+            nothingFoundLabel:SetFont("saoCustomFont")
+            nothingFoundLabel:SizeToContents()
+            nothingFoundLabel:SetWide(600)
+            nothingFoundLabel:SetPos(rightWhitePanel:GetWide() * 0.60 - nothingFoundLabel:GetWide() * 0.5, rightWhitePanel:GetTall() * 0.01)
+        end
         local categoryButton = vgui.Create("DButton", leftPanel)
         categoryButton:SetText(displayName)
         local icon = nil
@@ -620,6 +883,7 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
             surface.SetDrawColor(194, 193, 192, 255)
             surface.DrawRect(0, 0, categoryButton:GetWide(), categoryButton:GetTall())
         end
+        foundElements = true
         categoryButton.DoClick = function()
             local buttonY = 10
             if IsValid(selectedButton) then
@@ -628,6 +892,7 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
                     surface.DrawRect(0, 0, categoryButton:GetWide(), categoryButton:GetTall())
                 end
             end
+            selectedSubcategoryButton = categoryName
             categoryButton.Paint = function()
                 surface.SetDrawColor(150, 150, 150, 255)
                 surface.DrawRect(0, 0, categoryButton:GetWide(), categoryButton:GetTall())
@@ -637,15 +902,32 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
             end
             table.remove(optionButtons)
             selectedButton = categoryButton
+            categoryWidth = categoryButton:GetWide()
+            categoryHeight = categoryButton:GetTall()
             local catInfo
             if optionType == "server" then
                 catInfo = self.existingExternalOptions[addonName].server_options
             elseif optionType == "client" then
                 catInfo = self.existingExternalOptions[addonName].client_options
             end
+            local sortedOptionInfo = {}
             for optionName, optionInfo in pairs(catInfo[categoryName]) do
+                table.insert(sortedOptionInfo, {name = optionName, info = optionInfo})
+            end            
+            local function customSort(a, b)
+                local numA = tonumber(string.match(a.name, "%d+$")) or 0
+                local numB = tonumber(string.match(b.name, "%d+$")) or 0
+                return numA < numB
+            end
+            table.sort(sortedOptionInfo, customSort)
+            for _, optionData in ipairs(sortedOptionInfo) do  -- creating option buttons for selected category
+                local optionName = optionData.name
+                local optionInfo = optionData.info
                 if optionName ~= "name" and optionName ~= "icon" then
-                    local optionButton = vgui.Create("DButton", rightPanel)
+                    if optionInfo.default == nil and not optionInfo.type == "button" then
+                        Opmenu:createError(12, addonName, categoryName, nil, optionName, optionType)
+                    end
+                    local optionButton = vgui.Create("DButton", rightWhitePanel)
                     optionButton:SetText("")
                     optionButton:SetSize(rightWhitePanel:GetWide() * 0.97, buttonSizeY)
                     optionButton:SetPos(10, buttonY)
@@ -653,28 +935,30 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
                         surface.SetDrawColor(194, 193, 192, 255)
                         surface.DrawRect(0, 0, optionButton:GetWide(), optionButton:GetTall())
                     end
-                    local timerEnable = true
-                    optionButton.OnCursorEntered = function(self)
-                        if timerEnable then
-                            timer.Create("HoverTimer", 2, 1, function()
-                                hook.Add("DrawOverlay", "DrawHoverText", function()
-                                    local x, y = gui.MousePos()
-                                    local lines = string.Explode("\n", optionInfo.description)
-                                    local lineHeight = draw.GetFontHeight("DermaDefault")
-                                    for i, line in ipairs(lines) do
-                                        y = y + 4
-                                        draw.WordBox(2, x + 15, y + 10 + (i - 1) * lineHeight, line, "DermaDefault", Color(0, 0, 0, 200), Color(255, 255, 255, 255))
-                                    end
+                    if optionInfo.description ~= nil then
+                        local timerEnable = true
+                        optionButton.OnCursorEntered = function(self)
+                            if timerEnable then
+                                timer.Create("HoverTimer", 1, 1, function()
+                                    hook.Add("DrawOverlay", "DrawHoverText", function()
+                                        local x, y = gui.MousePos()
+                                        local lines = string.Explode("\n", optionInfo.description)
+                                        local lineHeight = draw.GetFontHeight("DermaDefault")
+                                        for i, line in ipairs(lines) do
+                                            y = y + 4
+                                            draw.WordBox(2, x + 15, y + 10 + (i - 1) * lineHeight, line, "DermaDefault", Color(0, 0, 0, 200), Color(255, 255, 255, 255))
+                                        end
+                                    end)
+                                    timerEnable = true
                                 end)
-                                timerEnable = true
-                            end)
-                            timerEnable = false
+                                timerEnable = false
+                            end
                         end
-                    end
-                    optionButton.OnCursorExited = function(self)
-                        timerEnable = true
-                        timer.Remove("HoverTimer")
-                        hook.Remove("DrawOverlay", "DrawHoverText")
+                        optionButton.OnCursorExited = function(self)
+                            timerEnable = true
+                            timer.Remove("HoverTimer")
+                            hook.Remove("DrawOverlay", "DrawHoverText")
+                        end
                     end
                     optionButton.Paint = function(self, w, h)
                         surface.SetDrawColor(194, 193, 192, 255)
@@ -693,39 +977,56 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
                     optionButton.label:SetWide(optionButton:GetWide() * 0.6)
                     optionButton.label:SetPos(10, optionButton:GetTall() - draw.GetFontHeight("saoOptionsFont") / 0.55 )
                     optionButton.OnMousePressed = function(self, key)
-                        if key == MOUSE_RIGHT then
-                            local menu = DermaMenu()
-                            local debuginfo = menu:AddOption("Debug Info")
-                            debuginfo:SetImage("icon16/script_code.png")
-                            menu:AddOption("ConVar: " .. optionInfo.conVar)
-                            menu:AddOption("Type: " .. optionInfo.type)
-                            menu:AddOption("Default Value: " .. optionInfo.default)
-                            if optionInfo.min ~= nil then
-                                menu:AddOption("Max Value: " .. optionInfo.max)
+                        if GetConVar("cl_sao_enable_debug"):GetInt() == 1 then -- debug menu
+                            if key == MOUSE_RIGHT then
+                                local menu = DermaMenu()
+                                local debuginfo = menu:AddOption("Debug Info")
+                                debuginfo:SetImage("icon16/script_code.png")
+                                if optionInfo.comboBox ~= nil then
+                                    menu:AddOption("ConVar: " .. optionInfo.conVar)
+                                end
+                                menu:AddOption("Type: " .. optionInfo.type)
+                                if optionInfo.default ~= nil then
+                                    menu:AddOption("Default Value: " .. optionInfo.default)
+                                end
+                                if optionInfo.min ~= nil then
+                                    menu:AddOption("Max Value: " .. optionInfo.max)
+                                end
+                                if optionInfo.max ~= nil then
+                                    menu:AddOption("Min Value: " .. optionInfo.min)
+                                end
+                                if optionInfo.dec ~= nil then
+                                    menu:AddOption("Decimals: " .. optionInfo.dec)
+                                end
+                                if optionInfo.flags ~= nil and optionType == "server" then
+                                    if table.concat(optionInfo.flags) == "" then
+                                        menu:AddOption("Flags: n/a")
+                                    else
+                                        menu:AddOption("Flags: " .. table.concat(optionInfo.flags, ", "))
+                                    end
+                                end
+                                if optionInfo.type == "button" then
+                                    if optionInfo.buttonType == "hook" then
+                                        menu:AddOption("Button type: hook")
+                                    elseif optionInfo.buttonType == "command" then
+                                        menu:AddOption("Button type: command")
+                                    end
+                                end
+                                if optionInfo.conVar ~= nil and GetConVar(optionInfo.conVar) ~= nil then
+                                    menu:AddOption("Current: " .. GetConVar(optionInfo.conVar):GetInt())
+                                elseif optionInfo.conVar == nil and optionInfo.type ~= "keybind" and optionInfo.type ~= "button" then
+                                    menu:AddOption("Current: nil")
+                                end
+                                menu:Open()
                             end
-                            if optionInfo.max ~= nil then
-                                menu:AddOption("Min Value: " .. optionInfo.min)
-                            end
-                            if optionInfo.dec ~= nil then
-                                menu:AddOption("Decimals: " .. optionInfo.dec)
-                            end
-                            if table.concat(optionInfo.flags) == "" then
-                                menu:AddOption("Flags: n/a")
-                            else
-                                menu:AddOption("Flags: " .. table.concat(optionInfo.flags, ", "))
-                            end
-                            if GetConVar(optionInfo.conVar) ~= nil then
-                                menu:AddOption("Current: " .. GetConVar(optionInfo.conVar):GetInt())
-                            end
-                            menu:Open()
                         end
                     end
-                    local optionTypes = {"checkbox", "slider", "textEntry", "comboBox", "click"}
+                    local optionTypes = {"checkbox", "slider", "textEntry", "comboBox", "button", "slideBox", "keybind"}
                     local isValidType = false
                     for _, v in ipairs(optionTypes) do
                         if v == optionInfo.type then
                             isValidType = true
-                            break -- No need to continue if a match is found
+                            break 
                         end
                     end
                     if not isValidType then
@@ -771,18 +1072,50 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
                                 RunConsoleCommand(optionInfo.conVar, value)
                             end
                         end
-                    elseif optionInfo.type == "slider" or "textEntery" then
+                    elseif optionInfo.type == "slider" or optionInfo.type == "textEntery" then
+                        local _optionButton = vgui.Create("DPanel", optionButton)
+                        _optionButton:SetSize(optionButton:GetWide() * 0.15, optionButton:GetTall() * 0.6)
+                        _optionButton:SetPos(optionButton:GetWide() * 0.75, 14)
                         local textEntry = vgui.Create("DTextEntry", optionButton)
                         textEntry:SetSize(optionButton:GetWide() * 0.15, optionButton:GetTall() * 0.6)
                         textEntry:SetPos(optionButton:GetWide() * 0.75, 14)
-                        textEntry:SetPlaceholderText("Current value: " .. GetConVar(optionInfo.conVar):GetFloat())
+                        if GetConVar(optionInfo.conVar) == nil then
+                            textEntry:SetPlaceholderText("Current value: nil")
+                        else
+                            textEntry:SetPlaceholderText("Current value: " .. GetConVar(optionInfo.conVar):GetFloat())
+                        end
+                        textEntry.Paint = function(self, w, h)
+                            local borderSize = 2
+                            surface.SetDrawColor(158, 157, 157, 255)
+                            surface.DrawRect(0, 0, w, borderSize)
+                            surface.DrawRect(0, h - borderSize, w, borderSize)
+                            surface.DrawRect(0, 0, borderSize, h)
+                            surface.DrawRect(w - borderSize, 0, borderSize, h)
+                            if self:GetText() == "" then
+                                draw.SimpleText(self:GetPlaceholderText(), "DermaDefault", 5, h / 2, Color(0, 0, 0), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                            end
+                            self:DrawTextEntryText(Color(0, 0, 0), Color(255, 255, 255), Color(0, 0, 0))
+                        end
                         if optionInfo.default < optionInfo.min then Opmenu:createError(10, addonName, categoryName, nil, optionName, optionType) return end
                         if optionInfo.min == nil or optionInfo.max == nil then Opmenu:createError(9, addonName, categoryName, nil, optionName, optionType) return end
                         textEntry.OnEnter = function(self)
                             local enteredValue = self:GetValue()
                             enteredValue = tonumber(enteredValue)
+                            if not tonumber(enteredValue) then
+                                notification.AddLegacy("[SAO] Entered value is not a number!", NOTIFY_ERROR, 4 )
+                                surface.PlaySound("buttons/button15.wav")
+                                return
+                            end
                             if enteredValue >= optionInfo.min and enteredValue <= optionInfo.max then
                                 RunConsoleCommand(optionInfo.conVar, enteredValue)
+                            end
+                            if enteredValue > optionInfo.max then
+                                notification.AddLegacy("[SAO] Entered value is too large!", NOTIFY_ERROR, 4 )
+                                surface.PlaySound("buttons/button15.wav")
+                            end
+                            if enteredValue < optionInfo.min then
+                                notification.AddLegacy("[SAO] Entered value is too small!", NOTIFY_ERROR, 4 )
+                                surface.PlaySound("buttons/button15.wav")
                             end
                         end
                         local minlabel = vgui.Create("DLabel", optionButton)
@@ -795,6 +1128,91 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
                         maxlabel:SetFont("DermaDefaultBold")
                         maxlabel:SetColor(Color(0, 0, 0))
                         maxlabel:SetPos(optionButton:GetWide() * 0.75 + textEntry:GetWide() + 10 , 30 )
+                    elseif optionInfo.type == "comboBox" then
+                        local _optionButton = vgui.Create("DPanel", optionButton)
+                        _optionButton:SetSize(optionButton:GetWide() * 0.2, optionButton:GetTall() * 0.6)
+                        _optionButton:SetPos(optionButton:GetWide() * 0.75, 14)
+                        local comboBox = vgui.Create("DComboBox", _optionButton)
+                        comboBox:SetPos(0, 0)
+                        comboBox:SetSize(optionButton:GetWide() * 0.2, optionButton:GetTall() * 0.6)
+                        comboBox:SetTextColor(Color(0, 0, 0, 255))
+                        comboBox:SetFont("DermaDefault")
+                        comboBox.Paint = function(self, w, h)
+                            local borderSize = 2
+                            surface.SetDrawColor(158, 157, 157, 255)
+                            surface.DrawRect(0, 0, w, borderSize)
+                            surface.DrawRect(0, h - borderSize, w, borderSize)
+                            surface.DrawRect(0, 0, borderSize, h)
+                            surface.DrawRect(w - borderSize, 0, borderSize, h)
+                        end
+                        local convarValue = GetConVar(optionInfo.conVar):GetInt()
+                        for key, value in pairs(optionInfo.comboBox) do
+                            if convarValue == tonumber(string.match(key, "%d+$")) then
+                                comboBox:SetValue(value)
+                                break
+                            end
+                        end
+                        local sortedKeys = {}
+                        for key, _ in pairs(optionInfo.comboBox) do
+                            table.insert(sortedKeys, key)
+                        end
+                        table.sort(sortedKeys, function(a, b)
+                            return tonumber(string.match(a, "%d+$")) < tonumber(string.match(b, "%d+$"))
+                        end)
+                        for _, key in ipairs(sortedKeys) do
+                            local option = optionInfo.comboBox[key]
+                            comboBox:AddChoice(option)
+                        end
+                        comboBox.OnSelect = function(panel, index, value, data)
+                            for _, key in ipairs(sortedKeys) do
+                                local optionIndex = tonumber(string.match(key, "%d+$"))
+                                if optionIndex == index then
+                                    RunConsoleCommand(optionInfo.conVar, index)
+                                    break
+                                end
+                            end
+                        end
+                    elseif optionInfo.type == "button" then
+                        local __optionButton = vgui.Create("DButton", optionButton)
+                        __optionButton:SetSize(optionButton:GetWide() * 0.2, optionButton:GetTall() * 0.6)
+                        __optionButton:SetPos(optionButton:GetWide() * 0.75, 14)
+                        __optionButton:SetText(optionInfo.buttonName)
+                        __optionButton.Paint = function(self, w, h)
+                            local borderSize = 2
+                            surface.SetDrawColor(Color(255, 255, 255, 140))
+                            surface.DrawRect(0, 0, w, h)
+                            surface.SetDrawColor(158, 157, 157, 255)
+                            surface.DrawRect(0, 0, w, borderSize)
+                            surface.DrawRect(0, h - borderSize, w, borderSize)
+                            surface.DrawRect(0, 0, borderSize, h)
+                            surface.DrawRect(w - borderSize, 0, borderSize, h)
+                        end
+                        __optionButton.DoClick = function(self)
+                            if optionInfo.buttonType == "hook" then
+                                hook.Call(optionInfo.hookName)
+                            elseif optionInfo.buttonType == "command" then
+                                RunConsoleCommand(optionInfo.buttonCommand)
+                            end
+                        end
+                    elseif optionInfo.type == "keybind" then
+                        local binder = vgui.Create("DBinder", optionButton)
+                        binder:SetSize(optionButton:GetWide() * 0.2, optionButton:GetTall() * 0.6)
+                        binder:SetPos(optionButton:GetWide() * 0.75, 14)
+                        local bindedKey = input.LookupBinding(optionInfo.conVar) or optionInfo.default
+                        binder:SetText(bindedKey)
+                        binder.Paint = function(self, w, h)
+                            local borderSize = 2
+                            surface.SetDrawColor(Color(255, 255, 255, 140))
+                            surface.DrawRect(0, 0, w, h)
+                            surface.SetDrawColor(158, 157, 157, 255)
+                            surface.DrawRect(0, 0, w, borderSize)
+                            surface.DrawRect(0, h - borderSize, w, borderSize)
+                            surface.DrawRect(0, 0, borderSize, h)
+                            surface.DrawRect(w - borderSize, 0, borderSize, h)
+                        end
+                        binder.OnChange = function(self, num)
+                            hook.Call(optionInfo.hookName, nil, num)
+                        end
                     end
                     table.insert(optionButtons, optionButton)
                     rightWhitePanel:SetSize(frameW * 0.79 - 5, rightPanel:GetTall())
@@ -808,13 +1226,245 @@ function Opmenu:CreateOptionPanels(frame, addonName, optionType)
     popupFrame = frame
 
     mainFrame.OnClose = function()
+        foundElements = false
         if IsValid(popupFrame) then
             popupFrame:Close()
             popupFrame = nil
         end
+        if IsValid(resetFrame) then
+            resetFrame:Close()
+            resetFrame = nil
+        end
+        if IsValid(createPresetsFrame) then
+            createPresetsFrame:Close()
+            createPresetsFrame = nil
+        end
+        if IsValid(loadPresetsframe) then
+            loadPresetsframe:Close()
+            loadPresetsframe = nil
+        end
+    end
+
+    popupFrame.OnClose = function()
+        foundElements = false
+        if IsValid(resetFrame) then
+            resetFrame:Close()
+            resetFrame = nil
+        end
+        if IsValid(createPresetsFrame) then
+            createPresetsFrame:Close()
+            createPresetsFrame = nil
+        end
     end
 
     return leftPanel, leftWhitePanel, rightPanel, rightWhitePanel
+end
+
+local fullPresetName = {}
+
+local function AddPresetToList(presetsData, presetList, filePath)
+    fullPresetName = {}
+    for presetName, presetData in pairs(presetsData) do
+        local displayName = string.gsub(presetName, "^server_", "")
+        displayName = string.gsub(displayName, "^client_", "")
+        local iconPath = nil
+        table.insert(fullPresetName, {displayName = displayName, fullPresetName = presetName})
+        if string.match(presetName, "^server_") then
+            iconPath = "icon16/drive.png"
+        elseif string.match(presetName, "^client_") then
+            iconPath = "icon16/user.png"
+        end
+        local innerData = util.JSONToTable(presetData)
+        local addonName = innerData.addonName or "Unknown Addon"
+        local listItem = presetList:AddLine(displayName, addonName)
+        if iconPath then
+            local iconImage = vgui.Create("DImage", listItem)
+            iconImage:SetImage(iconPath)
+            iconImage:SetPos(350,0)
+            iconImage:SetSize(16, 16)
+        end
+        listItem.OnRightClick = function()
+            local contextMenu = DermaMenu()
+            contextMenu:AddOption("Remove", function()
+                presetsData[presetName] = nil
+                local newPresetsData = util.TableToJSON(presetsData)
+                file.Write(filePath, newPresetsData)
+                presetList:RemoveLine(listItem:GetID())
+            end)
+            contextMenu:Open()
+        end
+    end
+end
+
+function Opmenu:LoadPresets()
+    local loadPresetsframe = vgui.Create("DFrame")
+    loadPresetsframe:SetSize(400, 500)
+    loadPresetsframe:SetTitle("Load preset")
+    loadPresetsframe:Center()
+    loadPresetsframe:MakePopup()
+
+    local presetList = vgui.Create("DListView", loadPresetsframe)
+    presetList:SetPos(10, 60)
+    presetList:SetSize(380, 430)
+    presetList:AddColumn("Preset Name")
+    presetList:AddColumn("Addon")
+
+    local searchEntry = vgui.Create("DTextEntry", loadPresetsframe)
+    searchEntry:SetSize(200, 20)
+    searchEntry:SetPos(10, 30)
+    searchEntry:SetPlaceholderText("Search Presets...")
+
+    local filterComboBox = vgui.Create("DComboBox", loadPresetsframe)
+    filterComboBox:SetSize(70, 20)
+    filterComboBox:SetPos(220, 30)
+    filterComboBox:AddChoice("All")
+    filterComboBox:AddChoice("Server")
+    filterComboBox:AddChoice("Client")
+    filterComboBox:SetValue("All")
+
+    local loadButton = vgui.Create("DButton", loadPresetsframe)
+    loadButton:SetSize(90, 20)
+    loadButton:SetPos(300, 30)
+    loadButton:SetText("Load")
+
+    local filePath = "sao_presets.txt"
+    local fileData = file.Read(filePath, "DATA")
+
+    if not fileData then return end
+    local presetsData = util.JSONToTable(fileData)
+
+    if not presetsData then return end
+
+    AddPresetToList(presetsData, presetList, filePath)
+
+    loadButton.DoClick = function()
+        local selectedLine = presetList:GetSelectedLine()
+        if not selectedLine then
+            notification.AddLegacy("[SAO] Nothing is selected!", NOTIFY_ERROR, 4 )
+            surface.PlaySound("buttons/button15.wav")
+            return
+        end
+    
+        local presetName = presetList:GetLine(selectedLine):GetColumnText(1)
+
+        for _, mapping in ipairs(fullPresetName) do
+            if mapping.displayName == presetName then
+                fullPresetName = mapping.fullPresetName
+                break
+            end
+        end
+    
+        if not fullPresetName then return end
+    
+        local presetData = presetsData[fullPresetName]
+        if not presetData then return end
+    
+        local decodedPresetData = util.JSONToTable(presetData)
+        if not decodedPresetData then return end
+    
+        for preset, values in pairs(decodedPresetData) do
+            if preset ~= "addonName" then
+                RunConsoleCommand(preset, values)
+            end
+        end
+        
+        notification.AddLegacy("[SAO] Preset '" .. presetName .. "' loaded successfully", NOTIFY_HINT, 4 )
+        surface.PlaySound("buttons/button15.wav")
+        print("[Simple Addon Options] Preset '" .. presetName .. "' loaded successfully.")
+    end
+
+    searchEntry.OnTextChanged = function(self)
+        local text = string.lower(self:GetValue())
+        presetList:Clear()
+        for presetName, presetData in pairs(presetsData) do
+            if string.find(string.lower(presetName), text) then
+                local displayName = string.gsub(presetName, "^server_", "")
+                displayName = string.gsub(displayName, "^client_", "")
+                local iconPath = nil
+                if string.match(presetName, "^server_") then
+                    iconPath = "icon16/drive.png"
+                elseif string.match(presetName, "^client_") then
+                    iconPath = "icon16/user.png"
+                end
+                local innerData = util.JSONToTable(presetData)
+                local addonName = innerData.addonName or "Unknown Addon"
+                local listItem = presetList:AddLine(displayName, addonName)
+                if iconPath then
+                    local iconImage = vgui.Create("DImage", listItem)
+                    iconImage:SetImage(iconPath)
+                    iconImage:SetPos(350,0)
+                    iconImage:SetSize(16, 16)
+                end
+                listItem.OnRightClick = function()
+                    local contextMenu = DermaMenu()
+                    contextMenu:AddOption("Remove", function()
+                        presetsData[presetName] = nil
+                        local newPresetsData = util.TableToJSON(presetsData)
+                        file.Write(filePath, newPresetsData)
+                        presetList:RemoveLine(listItem:GetID())
+                    end)
+                    contextMenu:Open()
+                end
+            end
+        end
+    end
+
+    filterComboBox.OnSelect = function(_, index, value)
+        local filterText = searchEntry:GetValue()
+        searchEntry:SetText("")
+        presetList:Clear()
+    
+        local selectedFilter = filterComboBox:GetOptionText(index)
+        if selectedFilter == "All" then
+            AddPresetToList(presetsData, presetList, filePath)
+        elseif selectedFilter == "Server" then
+            for presetName, presetData in pairs(presetsData) do
+                if string.match(presetName, "^server_") then
+                    local displayName = string.gsub(presetName, "^server_", "")
+                    local innerData = util.JSONToTable(presetData)
+                    local addonName = innerData.addonName or "Unknown Addon"
+                    local listItem = presetList:AddLine(displayName, addonName)
+                    local iconImage = vgui.Create("DImage", listItem)
+                    iconImage:SetImage("icon16/drive.png")
+                    iconImage:SetPos(350,0)
+                    iconImage:SetSize(16, 16)
+                    listItem.OnRightClick = function()
+                        local contextMenu = DermaMenu()
+                        contextMenu:AddOption("Remove", function()
+                            presetsData[presetName] = nil
+                            local newPresetsData = util.TableToJSON(presetsData)
+                            file.Write(filePath, newPresetsData)
+                            presetList:RemoveLine(listItem:GetID())
+                        end)
+                        contextMenu:Open()
+                    end
+                end
+            end
+        elseif selectedFilter == "Client" then
+            for presetName, presetData in pairs(presetsData) do
+                if string.match(presetName, "^client_") then
+                    local displayName = string.gsub(presetName, "^client_", "")
+                    local innerData = util.JSONToTable(presetData)
+                    local addonName = innerData.addonName or "Unknown Addon"
+                    local listItem = presetList:AddLine(displayName, addonName)
+                    local iconImage = vgui.Create("DImage", listItem)
+                    iconImage:SetImage("icon16/user.png")
+                    iconImage:SetPos(350,0)
+                    iconImage:SetSize(16, 16)
+                    listItem.OnRightClick = function()
+                        local contextMenu = DermaMenu()
+                        contextMenu:AddOption("Remove", function()
+                            presetsData[presetName] = nil
+                            local newPresetsData = util.TableToJSON(presetsData)
+                            file.Write(filePath, newPresetsData)
+                            presetList:RemoveLine(listItem:GetID())
+                        end)
+                        contextMenu:Open()
+                    end
+                end
+            end
+        end
+    end
 end
 
 hook.Add( "Initialize", "saofont", function()
@@ -830,4 +1480,12 @@ hook.Add( "Initialize", "saofont", function()
         weight = 1000,
         antialias = true
     })
+    surface.CreateFont( "saoProperties", {
+        font = "Arial",
+        extended = false,
+        size = 14,
+        weight = 500,
+        antialias = true,
+        italic = true,
+    } )
 end )
